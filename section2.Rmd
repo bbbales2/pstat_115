@@ -3,6 +3,7 @@ title: "Section 2"
 author: "PSTAT 115, Fall 2018"
 date: "October 10, 2018"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 urlcolor: blue
@@ -29,8 +30,8 @@ data()
 
 Let's use one of these to talk about generating models + covariates.
  
- ChickWeight is a dataset of weights collected over time for a number of different chicks on different diets. Let's load up the ChickWeight dataset into a tibble to make it easy to work with:
-  
+ChickWeight is a dataset of weights collected over time for a number of different chicks on different diets. Let's load up the ChickWeight dataset into a tibble to make it easy to work with:
+
 ```{r}
 df = ChickWeight %>% as.tibble
 ```
@@ -43,7 +44,7 @@ df = as.tibble(ChickWeight)
 
 Using tibbles (instead of base R dataframes) and pipes (instead of function calls) can make it easier to do basic data transformations. You can do all of this in base R as well.
 
-First let's print the ChickWeight dataframe and see what's in it:
+First let's print the ChickWeight tibble and see what's in it:
 
 ```{r}
 df
@@ -57,23 +58,11 @@ df %>%
   geom_histogram()
 ```
 
-Perhaps unsurprisingly, this plot is kind of unintelligible. There's all sorts of things mixed together, so let's try to use some more plots to break it apart.
-
-- What is the data we are trying to explain?
-
-- What are the covariates (the other data we measure that we're going to use to do our explaining)?
+Perhaps unsurprisingly, this plot is mostly unintelligible. There's all sorts of things mixed together, so let's try to use some more plots to break it apart.
 
 - What might we expect $p(\text{weight} | \text{Time} = t)$ to be?
 
-If we assume this conditional distribution is normal, then we're saying the output (weight), is characterized by two parameters that are functions of the covariates, $\mu$ and $\sigma$.
-
-- Assuming the diet has no effect, what might we expect $\mu(t)$ to look like?
-
-- What might we expect $\sigma(t)$ to look like?
-
-- And how might we take into account the diet ($\mu(t, d)$)?
-
-First let's verify that the conditional probabilities might even roughly be described by normals:
+Let's have a look!
 
 ```{r}
 df %>%
@@ -82,7 +71,17 @@ df %>%
   geom_histogram()
 ```
 
+Let's assume that the generating process is described by normals.
+
 - What are the limitations of the normal assumption here?
+
+If we assume this conditional distribution is normal, then we're saying the output (weight), is characterized by two parameters $\mu$ and $\sigma$ (that can be functions of the covariates). $\mu$ and $\sigma$ are our estimands here -- the things we'd try to estimate.
+
+- Assuming the diet has no effect, what might we expect $\mu(t)$ to look like?
+
+- What might we expect $\sigma(t)$ to look like?
+
+- And how might we take into account the diet ($\mu(t, d)$)?
 
 Let's try to get an idea of what $\mu(t)$ would look like by plotting weight vs. time:
 
@@ -115,7 +114,7 @@ df %>%
 
 - One of the goals of statistics is to generalize from sample to population. Do you think this generalizes to the larger chicken population? How about other species of chickens?
 
-- Sometimes the population of interest is quite a bit different from the studied population. In this theme, how do you think the information in this study generalizes to humans?
+- Sometimes the population of interest is quite a bit different from the studied population. How do you think the information in this study generalizes to humans?
 
 # Bayesian Example
 
@@ -124,13 +123,19 @@ An example from BDA3 (the Gelman book in the syllabus) is a spelling correction 
 First assume that there are only three words to consider, "radom", "random", and "radon". Assume also that you've been given the likelihoods for typing "radom" given you actually wanted to type each of those three words and also the prior probability that each of those words was what was typed.
 
 Likelihoods:
+
 $p(\text{typed radom} | \text{wanted to type random}) = 0.00193$
+
 $p(\text{typed radom} | \text{wanted to type radon}) = 0.000143$
+
 $p(\text{typed radom} | \text{wanted to type radom}) = 0.975$
 
 Priors:
+
 $p(\text{wanted to type random}) = 7.60e-5$
+
 $p(\text{wanted to type radon}) = 6.05e-6$
+
 $p(\text{wanted to type radom}) = 3.12e-7$
 
 Now we can use Bayes' rule to compute the posterior.
@@ -145,8 +150,11 @@ posterior
 ```
 
 Posterior:
+
 $p(\text{wanted to type random} | \text{typed radom}) = 0.325$
+
 $p(\text{wanted to type radon} | \text{typed radom}) = 0.002$
+
 $p(\text{wanted to type radom} | \text{typed radom}) = 0.673$
 
 # Questions
