@@ -3,9 +3,9 @@ title: "Section 2"
 author: "PSTAT 115, Fall 2018"
 date: "October 10, 2018"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
-  pdf_document: default
 urlcolor: blue
 ---
   
@@ -78,9 +78,11 @@ $$\text{weight}_i \sim N(\alpha t_i + \beta, \sigma)$$
 
 In this case the new estimands are $\alpha$, $\beta$, and $\sigma$. $\text{weight}_i$ and $t_i$ are both data.
 
-How might we expect the different diets to affect things? Maybe it doesn't affect the time zero weight of the chicken ($\beta$), but it does affect the slope ($\alpha$)?
+How might we expect the different diets to affect things? Maybe it doesn't affect the time zero weight of the chicken ($\beta$), but it does affect the slope ($\alpha$)? We can code in a diet dependence easily enough:
 
 $$\text{weight}_{i, d} \sim N(\alpha_d t_i + \beta, \sigma)$$
+
+The generating model also requires us to specify how the chickens are given a diet. We might assume this is uniformly sampled from the available diets, or something else. This is more important if we actually need to estimate the diet the chicken ate. In this case, the diet is given.
 
 # Exploring our data
 
