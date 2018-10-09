@@ -3,9 +3,9 @@ title: "Section 2"
 author: "PSTAT 115, Fall 2018"
 date: "October 10, 2018"
 output:
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
 urlcolor: blue
 ---
   
@@ -50,8 +50,42 @@ First let's print the ChickWeight tibble and see what's in it:
 df
 ```
 
-So the weights column looks interesting, let's look at that:
- 
+Usually we'd look at the data before writing out a generating model. Just as an exercise though, let's do the reverse. We'll write out a generating model and then make some plots to see how reasonable our assumptions were.
+
+* What is it that we are measuring?
+    + Weight
+
+* What other data did we collect to explain what we measured (covariates)?
+    + Time
+    + Chicken ID
+    + Diet
+
+The simplest thing we might assume is that errors in our measurements are normally distributed. This means:
+
+$$\text{weight} \sim N(\mu, \sigma)$$
+
+In this case, weight is fixed data, and we'll need to estimate $\mu$ and $\sigma$ (they are the estimands).
+
+* What might be a limitation of the normal assumption here?
+    + Our chickens grow over time. Lumping all the weights together at these different times won't produce a normal distribution.
+    + There are multiple diets. Should every diet have the same mean?
+    + Our outcomes appear to be discrete (looks like we'd never measure a weight of 75.33333 for instance)
+    + Weights will be non-negative
+
+How might we incorporate the chickens growing over time? We might assume that chickens grow linearly with time:
+
+$$\text{weight}_i \sim N(\alpha t_i + \beta, \sigma)$$
+
+In this case the new estimands are $\alpha$, $\beta$, and $\sigma$. $\text{weight}_i$ and $t_i$ are both data.
+
+How might we expect the different diets to affect things? Maybe it doesn't affect the time zero weight of the chicken ($\beta$), but it does affect the slope ($\alpha$)?
+
+$$\text{weight}_{i, d} \sim N(\alpha_d t_i + \beta, \sigma)$$
+
+# Exploring our data
+
+Since it is the weights we are concerned with, let's look at that first.
+
 ```{r}
 df %>%
   ggplot(aes(weight)) +
@@ -60,9 +94,7 @@ df %>%
 
 Perhaps unsurprisingly, this plot is mostly unintelligible. There's all sorts of things mixed together, so let's try to use some more plots to break it apart.
 
-- What might we expect $p(\text{weight} | \text{Time} = t)$ to be?
-
-Let's have a look!
+Let's have a look at $p(\text{weight} | \text{Time} = t)$.
 
 ```{r}
 df %>%
@@ -71,17 +103,7 @@ df %>%
   geom_histogram()
 ```
 
-Let's assume that the generating process is described by normals.
-
-- What are the limitations of the normal assumption here?
-
 If we assume this conditional distribution is normal, then we're saying the output (weight), is characterized by two parameters $\mu$ and $\sigma$ (that can be functions of the covariates). $\mu$ and $\sigma$ are our estimands here -- the things we'd try to estimate.
-
-- Assuming the diet has no effect, what might we expect $\mu(t)$ to look like?
-
-- What might we expect $\sigma(t)$ to look like?
-
-- And how might we take into account the diet ($\mu(t, d)$)?
 
 Let's try to get an idea of what $\mu(t)$ would look like by plotting weight vs. time:
 
@@ -90,6 +112,10 @@ df %>%
   ggplot(aes(Time, weight)) +
   geom_point()
 ```
+
+* How does this differ from what we proposed initially?
+    + The noise is heteroskedastic (this means the amount of noise changes with another covariate -- in this case time)
+    + The data is a bit non-linear
 
 Let's try to get a handle on how diet affects any of this:
 
@@ -108,13 +134,15 @@ df %>%
   facet_wrap(~ Diet, nrow = 2, labeller = label_both)
 ```
 
-# Questions
+* Does diet seem to have a strong affect on the growth of the chickens?
+    + The effect isn't clear to me. Maybe someone else is more creative. At best maybe diet 4 produces more consistently sized chickens? But that seems like it could just be noise.
+* What might be the next step in this analysis?
+    + I'd feed food to more chickens. It's probably not that expensive to collect more data here.
 
-- Do you think you have enough information to come to any conclusions about the different diets?
-
-- One of the goals of statistics is to generalize from sample to population. Do you think this generalizes to the larger chicken population? How about other species of chickens?
-
-- Sometimes the population of interest is quite a bit different from the studied population. How do you think the information in this study generalizes to humans?
+* There were fifty chickens in this dataset. That is not all chickens. How do you think this dataset generalizes to other chickens? To other birds? To mammals?
+    + I'm not sure if this dataset went all the way to adulthood.
+    + I might expect that similar diet variations in other birds might not have a big effect (maybe this is my prior). If there was a big effect, then there might be something interesting that is different between chickens and these other birds worth investigating.
+    + I would not expect the timescales or scale of the data to transfer.
 
 # Bayesian Example
 
@@ -124,19 +152,15 @@ First assume that there are only three words to consider, "radom", "random", and
 
 Likelihoods:
 
-$p(\text{typed radom} | \text{wanted to type random}) = 0.00193$
-
-$p(\text{typed radom} | \text{wanted to type radon}) = 0.000143$
-
-$p(\text{typed radom} | \text{wanted to type radom}) = 0.975$
+$$p(\text{typed radom} | \text{wanted to type random}) = 0.00193\\
+p(\text{typed radom} | \text{wanted to type radon}) = 0.000143\\
+p(\text{typed radom} | \text{wanted to type radom}) = 0.975$$
 
 Priors:
 
-$p(\text{wanted to type random}) = 7.60e-5$
-
-$p(\text{wanted to type radon}) = 6.05e-6$
-
-$p(\text{wanted to type radom}) = 3.12e-7$
+$$p(\text{wanted to type random}) = 7.60 * 10^{-5}\\
+p(\text{wanted to type radon}) = 6.05 * 10^{-6}\\
+p(\text{wanted to type radom}) = 3.12 * 10^{-7}$$
 
 Now we can use Bayes' rule to compute the posterior.
 
@@ -151,14 +175,17 @@ posterior
 
 Posterior:
 
-$p(\text{wanted to type random} | \text{typed radom}) = 0.325$
-
-$p(\text{wanted to type radon} | \text{typed radom}) = 0.002$
-
-$p(\text{wanted to type radom} | \text{typed radom}) = 0.673$
+$$p(\text{wanted to type random} | \text{typed radom}) = 0.325\\
+p(\text{wanted to type radon} | \text{typed radom}) = 0.002\\
+p(\text{wanted to type radom} | \text{typed radom}) = 0.673$$
 
 # Questions
 
+- Was this what you expected?
+    + The probability of no error seems high. Radom is a city in Poland though. Maybe it is a more popular topic of discussion than we might expect?
+
 - How do you think the prior was estimated?
+    + Empirical counts
 
 - How do you think the likelihood was estimated?
+    + Perhaps there was a study for this? Maybe a researcher sat hundreds of people down on keyboards and tried to understand the types of spelling mistakes that were more or less common
