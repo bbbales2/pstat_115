@@ -52,10 +52,10 @@ df
 
 Usually we'd look at the data before writing out a generating model. Just as an exercise though, let's do the reverse. We'll write out a generating model and then make some plots to see how reasonable our assumptions were.
 
-* What is it that we are measuring?
+* What is it that we're trying to model?
     + Weight
 
-* What other data did we collect to explain what we measured (covariates)?
+* What other data did we collect to explain what we're modeling (covariates)?
     + Time
     + Chicken ID
     + Diet
@@ -67,9 +67,9 @@ $$\text{weight} \sim N(\mu, \sigma)$$
 In this case, weight is fixed data, and we'll need to estimate $\mu$ and $\sigma$ (they are the estimands).
 
 * What might be a limitation of the normal assumption here?
-    + Our chickens grow over time. Lumping all the weights together at these different times won't produce a normal distribution.
+    + Our chickens grow over time. Lumping all the weights together at these different times won’t produce a normal distribution.
     + There are multiple diets. Should every diet have the same mean?
-    + Our outcomes appear to be discrete (looks like we'd never measure a weight of 75.33333 for instance)
+    + Our outcomes appear to be rounded (looks like we’d never measure a weight of 75.33333 for instance)
     + Weights will be non-negative
 
 How might we incorporate the chickens growing over time? We might assume that chickens grow linearly with time:
@@ -83,6 +83,10 @@ How might we expect the different diets to affect things? Maybe it doesn't affec
 $$\text{weight}_{i, d} \sim N(\alpha_d t_i + \beta, \sigma)$$
 
 The generating model also requires us to specify how the chickens are given a diet. We might assume this is uniformly sampled from the available diets, or something else. This is more important if we actually need to estimate the diet the chicken ate. In this case, the diet is given.
+
+# Likelihood
+
+We'll do this on the board. Just leaving a note here so we don't forget. Also do data generating process pseudocode if there is time.
 
 # Exploring our data
 
@@ -116,8 +120,7 @@ df %>%
 ```
 
 * How does this differ from what we proposed initially?
-    + The noise is heteroskedastic (this means the amount of noise changes with another covariate -- in this case time)
-    + The data is a bit non-linear
+    + The noise is heteroskedastic (this means the amount of noise changes with another covariate – in this case time)
 
 Let's try to get a handle on how diet affects any of this:
 
@@ -132,17 +135,18 @@ That's kindof hard to see. Maybe we can break this out into different plots:
 ```{r}
 df %>%
   ggplot(aes(Time, weight)) +
-  geom_point() +
+  geom_point(aes(color = Diet)) +
   facet_wrap(~ Diet, nrow = 2, labeller = label_both)
 ```
 
 * Does diet seem to have a strong affect on the growth of the chickens?
-    + The effect isn't clear to me. Maybe someone else is more creative. At best maybe diet 4 produces more consistently sized chickens? But that seems like it could just be noise.
-* What might be the next step in this analysis?
-    + I'd feed food to more chickens. It's probably not that expensive to collect more data here.
+    + The effect isn’t clear to me. Maybe someone else is more creative. At best maybe diet 4 produces more consistently sized chickens?
 
-* There were fifty chickens in this dataset. That is not all chickens. How do you think this dataset generalizes to other chickens? To other birds? To mammals?
-    + I'm not sure if this dataset went all the way to adulthood.
+* What might be the next step in this analysis?
+    + I’d feed food to more chickens. It’s probably not that expensive to collect more data here.
+
+* There were fifty chickens in this dataset. That is not all chickens. How do you think this dataset generalizes to other chickens? To other birds?
+    + I’m not sure if this dataset went all the way to adulthood.
     + I might expect that similar diet variations in other birds might not have a big effect (maybe this is my prior). If there was a big effect, then there might be something interesting that is different between chickens and these other birds worth investigating.
     + I would not expect the timescales or scale of the data to transfer.
 
@@ -154,15 +158,15 @@ First assume that there are only three words to consider, "radom", "random", and
 
 Likelihoods:
 
-$$p(\text{typed radom} | \text{wanted to type random}) = 0.00193\\
-p(\text{typed radom} | \text{wanted to type radon}) = 0.000143\\
-p(\text{typed radom} | \text{wanted to type radom}) = 0.975$$
+$$p(\text{typed radom} | \text{wanted to type random}) = 0.00193$$
+$$p(\text{typed radom} | \text{wanted to type radon}) = 0.000143$$
+$$p(\text{typed radom} | \text{wanted to type radom}) = 0.975$$
 
 Priors:
 
-$$p(\text{wanted to type random}) = 7.60 * 10^{-5}\\
-p(\text{wanted to type radon}) = 6.05 * 10^{-6}\\
-p(\text{wanted to type radom}) = 3.12 * 10^{-7}$$
+$$p(\text{wanted to type random}) = 7.60 * 10^{-5}$$
+$$p(\text{wanted to type radon}) = 6.05 * 10^{-6}$$
+$$p(\text{wanted to type radom}) = 3.12 * 10^{-7}$$
 
 Now we can use Bayes' rule to compute the posterior.
 
@@ -177,9 +181,9 @@ posterior
 
 Posterior:
 
-$$p(\text{wanted to type random} | \text{typed radom}) = 0.325\\
-p(\text{wanted to type radon} | \text{typed radom}) = 0.002\\
-p(\text{wanted to type radom} | \text{typed radom}) = 0.673$$
+$$p(\text{wanted to type random} | \text{typed radom}) = 0.325$$
+$$p(\text{wanted to type radon} | \text{typed radom}) = 0.002$$
+$$p(\text{wanted to type radom} | \text{typed radom}) = 0.673$$
 
 # Questions
 
