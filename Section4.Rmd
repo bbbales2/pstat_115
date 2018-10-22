@@ -1,0 +1,211 @@
+---
+title: "Section 4: Importance Sampling and Rejection Sampling"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this section we'll review importance sampling and rejection sampling.
+
+## Rejection Sampling
+
+Rejection sampling is easiest to think of graphically. We first plot the probability density function or probability mass function of the distribution that we want to sample from. If we can uniformly sample from a region that bounds this pdf/pmf, then we can do rejection sampling by:
+
+1. Drawing a uniform random number from the larger region
+2. Using the random number if it falls inside the pdf/pmf or throwing it away otherwise
+
+```{r}
+N = 1000
+
+alpha = 2.0
+beta = alpha
+maxB = dbeta(0.5, alpha, beta) # Maximum value of density is 0.5 if alpha == beta
+
+list(x = runif(N),
+     y = runif(N) * maxB) %>%
+  as.tibble %>%
+  mutate(use = y < dbeta(x, alpha, beta)) %>%
+  ggplot(aes(x, y)) +
+  geom_point(aes(color = use)) +
+  stat_function(fun = function(x) dbeta(x, alpha, beta)) +
+  geom_rect(aes(xmin = 0.0, xmax = 1.0, ymin = 0.0, ymax = maxB), alpha = 0.0, color = "red") +
+  ggtitle("Proposal distribution outlined in red, target in black")
+```
+
+The points highlighted in teal above have the desired distribution. We throw away the reddish samples.
+
+## Importance Sampling
+
+In importance sampling, we want to numerically compute the expectation $\int f(x) p(x) dx$. The simplest way to do this with Monte Carlo is with the sum $\frac{1}{N} \sum_i^N f(x_i)$ where $x_i$ is a sequence of random numbers generated from the distribution $p(x)$.
+
+If we cannot easily generate numbers from $p(x)$ (this happens frequently), then we can use importance sampling to compute the expectation. The first step is to multiply the stuff in the integral by a 1:
+
+$$\int f(x) p(x) dx = \int f(x) \frac{g(x)}{g(x)}p(x)dx$$
+In this case $g(x)$ is another probability distribution. If we swap the $p(x)$ and the $g(x)$ in the numerator and make a new variable $\hat{f}(x) = f(x) \frac{p(x)}{g(x)}$, we get
+
+$$\int f(x) \frac{p(x)}{g(x)}p(x)dx = \int \hat{f}(x) g(x) dx$$
+
+We can estimate this integral with $\frac{1}{N} \sum_i^N \hat{f}(x_i)$ where $x_i$ is a sequence of random numbers from the distribution $g(x)$. Expanding out this sum gives us the equation we seek:
+
+$$\frac{1}{N} \sum_i^N f(x_i) \frac{p(x_i)}{g(x_i)}$$
+With this we can compute an estimate of $\int f(x) p(x) dx$ without having to compute that integral or know how to generate random numbers with the distribution $p(x)$. All we need is another probability density $g(x)$ from which we can draw random numbers and evaluate the PDF.
+
+The choice of $g(x)$ is non-trivial and greatly affects the efficiency of this method.
+
+## Can we sample from the beta(2.0, 2.0) distribution more efficiently?
+
+```{r}
+N = 1000
+
+alpha = 2.0
+beta = alpha
+maxB = dbeta(0.5, alpha, beta) # Maximum value of density is 0.5 if alpha == beta
+
+list(x = runif(N),
+     y = runif(N) * maxB) %>%
+  as.tibble %>%
+  mutate(use = y < dbeta(x, alpha, beta)) %>%
+  ggplot(aes(x, y)) +
+  geom_point(aes(color = use)) +
+  stat_function(fun = function(x) dbeta(x, alpha, beta)) +
+  stat_function(fun = function(x) 1.25 * dnorm(x, 0.5, 0.32), color = "blue") +
+  geom_rect(aes(xmin = 0.0, xmax = 1.0, ymin = 0.0, ymax = maxB), alpha = 0.0, color = "red") +
+  ggtitle("Square proposal distribution outlined in red,\nGaussian proposal in blue,\nTarget in black")
+```
+
+```{r}
+N = 1000
+P = 1000
+yunif = rep(0, P)
+ynorm = rep(0, P)
+for(p in 1:1000) {
+  # Square proposal
+  x = runif(N)
+  y = runif(N) * maxB
+  yunif[p] = sum(y < dbeta(x, alpha, beta))
+  
+  # Normal proposal
+  x = runif(N)
+  y = 1.25 * dnorm(x, 0.5, 0.32) * runif(N)
+  ynorm[p] = sum(y < dbeta(x, alpha, beta))
+}
+
+list(yunif = yunif,
+     ynorm = ynorm) %>% as.tibble %>%
+  gather(which, y) %>%
+  ggplot(aes(y)) +
+  geom_histogram(aes(fill = which))
+```
+  
+## Can we rejection sample from a beta(0.9, 0.9)?
+
+It'd be a trick. The distribution is unbounded in y (dbeta(0, 0.9, 0.9) == inf). We'd probably want to sample from an unbounded distribution on y and then do the rejection ratio by comparing against the inverse of the beta density (which is a multivalued inverse).
+
+## Can compute expectations over the beta(0.9, 0.9) distribution using importance sampling?
+
+Sure thing. What is a possible proposal distribution? For lack of anything else, let's use a uniform distribution on [0, 1], so $q(x) = 1$. How many samples should we take? It's unclear. Let's just repeat the estimate for a bunch of different numbers of samples and see how it converges.
+
+```{r}
+alpha = 0.9
+beta = alpha
+
+q = function(x) 1
+p = function(x) dbeta(x, alpha, beta)
+
+N = 1000
+Ns = 1:N
+estimate = rep(0, N)
+for(n in Ns) {
+  x = runif(n)
+  estimate[n] = sum(x * p(x) / q(x)) / n
+}
+
+list(Ns = Ns,
+     estimate = estimate) %>%
+  as.tibble %>%
+  ggplot(aes(Ns, estimate)) +
+  geom_point() +
+  geom_hline(aes(yintercept = 0.5), color = "red") +
+  ggtitle("Estimates for E[x] varying numbers of samples in black\nTruth in red")
+
+```
+
+## Can we compute expectations over the beta(2.0, 2.0) distribution using importance sampling?
+
+Why not? Let's use the truncated normal distribution from above as a proposal distribution. Let's also compute the expectation $\text{E}[\text{sin}(\pi x)]$.
+
+```{r}
+alpha = 2.0
+beta = alpha
+
+q = function(x) dnorm(x, 0.5, 0.32)
+p = function(x) dbeta(x, alpha, beta)
+
+N = 1000
+Ns = 1:N
+estimate = rep(0, N)
+for(n in Ns) {
+  x = rnorm(n, 0.5, 0.32)
+  estimate[n] = sum(sin(pi * x) * p(x) / q(x)) / n
+}
+
+list(Ns = Ns,
+     estimate = estimate) %>%
+  as.tibble %>%
+  ggplot(aes(Ns, estimate)) +
+  geom_point() +
+  ggtitle("Estimate of E[sin(x)] for varying numbers of samples in black")
+
+```
+## How do the parameters of the proposal distribution affect the importance sampling efficiency?
+
+Do you think we did a good job?
+
+Let's compute the empirical variance of our estimator of $\text{E}[\text{sin}(\pi x)]$ for a variety of different proposal variances to see what happens.
+
+```{r}
+R = 100
+sigmas = seq(0.1, 0.5, length = 50)
+
+alpha = 2.0
+beta = alpha
+
+q = function(x, sigma) dnorm(x, 0.5, sigma)
+p = function(x) dbeta(x, alpha, beta)
+
+N = 1000
+tibbles = list()
+for(i in 1:length(sigmas)) {
+  sigma = sigmas[i]
+  estimates = rep(0, P)
+  for(r in 1:R) {
+    x = rnorm(N, 0.5, sigma)
+    estimates[r] = sum(sin(pi * x) * p(x) / q(x, sigma)) / N
+  }
+  tibbles[[i]] = list(esimates = estimates, sigma = sigma) %>% as.tibble
+}
+
+tibbles %>% bind_rows %>%
+  ggplot(aes(sigma, esimates)) +
+  geom_point(alpha = 0.5)
+```
+
+Who knew? Looks like a standard deviation of about ~0.18 is most efficient for computing this estimate.
+
+```{r}
+alpha = 2.0
+beta = alpha
+
+list(x = seq(0, 1, length = 1000)) %>%
+  as.tibble %>%
+  ggplot(aes(x)) +
+  stat_function(fun = function(x) dbeta(x, alpha, beta)) +
+  stat_function(fun = function(x) dnorm(x, 0.5, 0.18), color = "blue") +
+  ggtitle("Target in black, Importance sampling distribution in blue")
+```

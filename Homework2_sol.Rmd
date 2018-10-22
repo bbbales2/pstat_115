@@ -1,0 +1,130 @@
+---
+title: "Homework 2"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Question 1
+
+(a) I expect the average to be the same.
+
+The variance for gamma(120, 10) will be lower.
+
+(b) First we gotta compute our posteriors:
+
+```{r cars}
+yA = c(12, 9, 12, 14, 13, 13, 15, 8, 15, 6)
+yB = c(11, 11, 10, 9, 9, 8, 7, 10, 6, 8, 8, 9, 7)
+
+alpha_A = 120
+beta_A = 10
+
+alpha_B = 12
+beta_B = 1
+
+alpha_A_posterior = alpha_A + sum(yA)
+beta_A_posterior = beta_A + length(yA)
+
+alpha_B_posterior = alpha_B + sum(yB)
+beta_B_posterior = beta_B + length(yB)
+```
+
+Distributions:
+$$p(\theta_A | y_A) = \text{gamma}(11.9, .593)$$
+$$p(\theta_B | y_B) = \text{gamma}(8.93, 0.638)$$
+
+Means and variances:
+```
+print(paste0("Posterior mean of theta_A ", alpha_A_posterior / beta_A_posterior))
+print(paste0("Posterior variance of theta_A ", alpha_A_posterior / beta_A_posterior^2))
+print(paste0("Posterior mean of theta_B ", alpha_B_posterior / beta_B_posterior))
+print(paste0("Posterior variance of theta_B ", alpha_B_posterior / beta_B_posterior^2))
+
+#curve(dgamma(x, alpha_Ap, beta_A_posterior), 0, 20, col = 'blue')
+#curve(dgamma(x, alpha_Bp, beta_B_posterior), 0, 20, add = TRUE, col = 'red')
+#title('Posterior of theta_A in blue, theta_B in red')
+```
+
+Quantiles:
+```{r}
+print(paste0("Posterior 95% quantile for theta_A is [", qgamma(0.025, alpha_A_posterior, beta_A_posterior), ", ", qgamma(0.975, alpha_A_posterior, beta_A_posterior), "]"))
+print(paste0("Posterior 95% quantile for theta_A is [", qgamma(0.025, alpha_B_posterior, beta_B_posterior), ", ", qgamma(0.975, alpha_B_posterior, beta_B_posterior), "]"))
+```
+
+(c) Write a little loop that computes the posterior of theta_B for each value of n0:
+
+```{r}
+means = rep(0, 50)
+for (n0 in 1:50) {
+  alpha_B_posterior = 12 * n0 + sum(yB)
+  beta_B_posterior = n0 + length(yB)
+  means[n0] = alpha_B_posterior / beta_B_posterior
+}
+plot(1:50, means, xlab = "n0", ylab = "posterior mean of theta_B")
+```
+
+(d) From the original question, we expect that the cancer rates of the two rats would be positively correlated.
+
+We might want to use a prior that implies $\theta_A$ and $\theta_B$ are positively correlated. Assuming that $\theta_A$ and $\theta_B$ are independent does not help us really.
+
+# Question 2
+
+(a) 
+
+- By the mean formula for gamma distribution, the mean rates are $\frac{3}{2000}$ and $\frac{7}{1000}$.
+
+- Consider the variance of the prior distributions, $\frac{3}{2000^2}$ and $\frac{7}{1000^2}$, respectively.
+Therefore, the second expert is more confident. 
+
+(b)
+```{r}
+gamma_fun1 <- function(l) {2000^3/gamma(3) * l^(3-1) * exp(-2000 * l)}
+gamma_fun2 <- function(l) {1000^7/gamma(7) * l^(7-1) * exp(-1000 * l)}
+
+curve(0.5 * 2000^3/gamma(3) * l^(3-1) * exp(-2000 * l) 
+              + 0.5 * 1000^7/gamma(7) * l^(7-1) * exp(-1000 * l),
+      from = 0, to = 0.03, xname = 'l', xlab = "lambda", ylab = "density")
+```
+
+(c)
+
+* 
+\begin{align*}
+posterior & \propto e^{-1767 * \lambda} * \frac{(1767 * \lambda) ^ 8} {8!} * (0.5 * \frac{2000^3}{\Gamma(3)} \lambda^{3-1} e^{-2000 * \lambda} + 0.5 * \frac{1000^7}{\Gamma(7)} \lambda^{7-1} e^{-1000 * \lambda}) \\
+& \propto e^{-1767 * \lambda} *  \lambda ^ 8* ( \frac{2000^3}{\Gamma(3)} \lambda^{2} e^{-2000 * \lambda} +  \frac{1000^7}{\Gamma(7)} \lambda^{6} e^{-1000 * \lambda}) 
+\end{align*}
+
+(d)
+
+* \begin{align*}
+K &= \int^{\infty}_{0}{e^{-1767 * \lambda} * \frac{(1767 * \lambda) ^ 8} {8!} * (0.5 * \frac{2000^3}{\Gamma(3)} \lambda^{3-1} e^{-2000 * \lambda} + 0.5 * \frac{1000^7}{\Gamma(7)} \lambda^{7-1} e^{-1000 * \lambda})}d\lambda\\
+&= \int^{\infty}_{0}0.5 * \frac{2000^3}{\Gamma(3)} * \frac{1767^8}{8!} \lambda^{10}e^{-3767 * \lambda}d\lambda + \int^{\infty}_{0}0.5 * \frac{1000^7}{\Gamma(7)} * \frac{1767^8}{8!} \lambda^{14}e^{-2767 * \lambda}d\lambda \\
+&=  0.5 * \frac{2000^3}{\Gamma(3)} * \frac{1767^8}{8!} \int^{\infty}_{0}\lambda^{10}e^{-3767 * \lambda}d\lambda + 0.5 * \frac{1000^7}{\Gamma(7)} * \frac{1767^8}{8!}* \int^{\infty}_{0}\lambda^{14}e^{-2767 * \lambda}d\lambda\\
+&= 0.5 * \frac{2000^3}{\Gamma(3)} * \frac{1767^8}{8!} * \frac{\Gamma(11)}{3767^{11}} + 0.5 * \frac{1000^7}{\Gamma(7)} * \frac{1767^8}{8!} * \frac{\Gamma(15)}{2767^{15}}
+\end{align*}
+
+* It becomes a mixture of Gamma(11, 3767) and Gamma(15, 2767)
+$$posterior = \frac{1767^8 * 0.5 * 2000^3}{8!K \Gamma(3)}\lambda^{10}e^{-3767 \lambda} + \frac{1767^8 * 0.5 * 1000^7}{8!K \Gamma(7)}\lambda^{14}e^{-2767 \lambda}$$
+
+(e)
+
+```{r}
+K = 0.5 * 2000^3/gamma(3) * 1767^8/factorial(8) * gamma(11)/3767^11 +
+  0.5 * 1000^7/gamma(7) * 1767^8 / factorial(8) * gamma(15)/2767^15
+
+const1 = 1767^8 * 0.5 * 2000^3/factorial(8)/K/gamma(3)
+const2 = 1767^8 * 0.5 * 1000^7/factorial(8)/K/gamma(7)
+
+curve(const1 * l^10 * exp(-3767 * l) + const2 * l^14 * exp(-2767 * l),
+      from = 0, to = 0.03, xname = "l", 
+      xlab = "lambda", ylab = "density")
+
+# two rates
+abline(v = 3/2000, col = 'blue')
+abline(v = 7/1000, col = 'blue')
+
+# mle
+abline(v = 8/1767, col = 'red')
+```
+

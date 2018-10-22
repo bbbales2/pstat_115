@@ -1,0 +1,56 @@
+---
+title: "Homework4_sol"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+```
+
+## 1a
+
+```{r}
+alpha = 1
+theta = 0.5
+
+g = function(y) {
+  out = 2 * theta^(2 * alpha) * y^(2 * alpha - 1) * exp(-theta * theta * y * y) / gamma(alpha)
+  
+  out[y < 0] = 0
+
+  out
+}
+
+print(paste0("E[Y | alpha] = ", gamma(alpha + 0.5) / (theta * gamma(alpha))))
+estimate = rep(0, 1000)
+for(k in 1:length(estimate)) {
+  y = rexp(k, 1)
+  estimate[k] = sum(y * (g(y) / dexp(y))) / length(y)
+  print(paste0("k = ", k, ", estimate = ", estimate[k]))
+}
+
+plot(1:length(estimate), estimate)
+```
+
+```{r}
+y = rexp(k, 1)
+w = g(y) / dexp(y)
+hist(log(w), main = "Histogram of log importance weights")
+```
+```{r}
+estimate = rep(0, 1000)
+for(k in 1:length(estimate)) {
+  y = rnorm(k, 1.5, 1)
+  estimate[k] = sum(y * (g(y) / dnorm(y, 1.5, 1))) / length(y)
+  print(paste0("k = ", k, ", estimate = ", estimate[k]))
+}
+
+plot(1:length(estimate), estimate)
+```
+
+```{r}
+y = rnorm(1000, 1.5, 1)
+w = g(y) / dnorm(y, 1.5, 1)
+hist(log(w), main = "Histogram of log importance weights for normal proposal")
+```
