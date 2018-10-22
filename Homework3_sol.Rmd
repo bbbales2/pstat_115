@@ -18,8 +18,8 @@ y_B = c(11, 11, 10, 9, 9, 8, 7, 10, 6, 8, 8, 9, 7)
 pr = rep(0, 50)
 n0s = 1:length(pr)
 for(n0 in n0s) {
-  theta_A = rgamma(100000, 120 + sum(y_A), 10 + length(y_A))
-  theta_B = rgamma(100000, 12 * n0 + sum(y_B), n0 + length(y_B))
+  theta_A = rgamma(10000, 120 + sum(y_A), 10 + length(y_A))
+  theta_B = rgamma(10000, 12 * n0 + sum(y_B), n0 + length(y_B))
   
   pr[n0] = sum(theta_B < theta_A) / length(theta_B)
 }

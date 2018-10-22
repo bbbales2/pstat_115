@@ -24,8 +24,9 @@ Rejection sampling is easiest to think of graphically. We first plot the probabi
 N = 1000
 
 alpha = 2.0
-beta = alpha
-maxB = dbeta(0.5, alpha, beta) # Maximum value of density is 0.5 if alpha == beta
+beta = 3.0
+mode = (alpha - 1) / (alpha + beta - 2)
+maxB = dbeta(mode, alpha, beta)
 
 list(x = runif(N),
      y = runif(N) * maxB) %>%
@@ -64,17 +65,21 @@ The choice of $g(x)$ is non-trivial and greatly affects the efficiency of this m
 N = 1000
 
 alpha = 2.0
-beta = alpha
-maxB = dbeta(0.5, alpha, beta) # Maximum value of density is 0.5 if alpha == beta
+beta = 3.0
+mode = (alpha - 1) / (alpha + beta - 2)
+maxB = dbeta(mode, alpha, beta)
 
-list(x = runif(N),
-     y = runif(N) * maxB) %>%
+x = runif(N)
+y = runif(N) * 1.35 * dnorm(x, mode, 0.3)
+
+list(x = x,
+     y = y) %>%
   as.tibble %>%
   mutate(use = y < dbeta(x, alpha, beta)) %>%
   ggplot(aes(x, y)) +
   geom_point(aes(color = use)) +
   stat_function(fun = function(x) dbeta(x, alpha, beta)) +
-  stat_function(fun = function(x) 1.25 * dnorm(x, 0.5, 0.32), color = "blue") +
+  stat_function(fun = function(x) 1.35 * dnorm(x, mode, 0.3), color = "blue") +
   geom_rect(aes(xmin = 0.0, xmax = 1.0, ymin = 0.0, ymax = maxB), alpha = 0.0, color = "red") +
   ggtitle("Square proposal distribution outlined in red,\nGaussian proposal in blue,\nTarget in black")
 ```
@@ -82,25 +87,32 @@ list(x = runif(N),
 ```{r}
 N = 1000
 P = 1000
+
+alpha = 2.0
+beta = 3.0
+mode = (alpha - 1) / (alpha + beta - 2)
+maxB = dbeta(mode, alpha, beta)
+
 yunif = rep(0, P)
 ynorm = rep(0, P)
 for(p in 1:1000) {
   # Square proposal
   x = runif(N)
   y = runif(N) * maxB
-  yunif[p] = sum(y < dbeta(x, alpha, beta))
+  yunif[p] = sum(y < dbeta(x, alpha, beta)) / N
   
   # Normal proposal
   x = runif(N)
-  y = 1.25 * dnorm(x, 0.5, 0.32) * runif(N)
-  ynorm[p] = sum(y < dbeta(x, alpha, beta))
+  y = 1.35 * dnorm(x, mode, 0.3) * runif(N)
+  ynorm[p] = sum(y < dbeta(x, alpha, beta)) / N
 }
 
 list(yunif = yunif,
      ynorm = ynorm) %>% as.tibble %>%
   gather(which, y) %>%
   ggplot(aes(y)) +
-  geom_histogram(aes(fill = which))
+  geom_histogram(aes(fill = which)) +
+  xlab("Acceptance probabilities (this percentage of the samples generated are useful)")
 ```
   
 ## Can we rejection sample from a beta(0.9, 0.9)?
@@ -131,28 +143,36 @@ list(Ns = Ns,
   as.tibble %>%
   ggplot(aes(Ns, estimate)) +
   geom_point() +
-  geom_hline(aes(yintercept = 0.5), color = "red") +
+  geom_hline(aes(yintercept = alpha / (alpha + beta)), color = "red") +
   ggtitle("Estimates for E[x] varying numbers of samples in black\nTruth in red")
 
 ```
 
-## Can we compute expectations over the beta(2.0, 2.0) distribution using importance sampling?
+## Can we compute expectations over the beta(2.0, 3.0) distribution using importance sampling?
 
-Why not? Let's use the truncated normal distribution from above as a proposal distribution. Let's also compute the expectation $\text{E}[\text{sin}(\pi x)]$.
+Why not? Let's use the truncated normal distribution from above as a proposal distribution. Let's also compute the variance.
 
 ```{r}
 alpha = 2.0
-beta = alpha
+beta = 3.0
 
-q = function(x) dnorm(x, 0.5, 0.32)
+mode = (alpha - 1) / (alpha + beta - 2)
+
+q = function(x) {
+  dnorm(x, mode, 0.3) / (pnorm(1.0, mode, 0.3) - pnorm(0.0, mode, 0.3))
+}
 p = function(x) dbeta(x, alpha, beta)
 
 N = 1000
 Ns = 1:N
 estimate = rep(0, N)
 for(n in Ns) {
-  x = rnorm(n, 0.5, 0.32)
-  estimate[n] = sum(sin(pi * x) * p(x) / q(x)) / n
+  x = rnorm(2 * n, mode, 0.30)
+  x = x[x > 0 & x < 1]
+  x = x[1:n]
+  if(length(x) < n)
+    warning("Didn't manage to generate N samples. Try this again probly")
+  estimate[n] = sum(x^2  * p(x) / q(x)) / n - (sum(x  * p(x) / q(x)) / n)^2
 }
 
 list(Ns = Ns,
@@ -160,14 +180,15 @@ list(Ns = Ns,
   as.tibble %>%
   ggplot(aes(Ns, estimate)) +
   geom_point() +
-  ggtitle("Estimate of E[sin(x)] for varying numbers of samples in black")
+  geom_hline(aes(yintercept = alpha * beta / ((alpha + beta)^2 * (alpha + beta + 1))), color = "red") +
+  ggtitle("Estimate of variance for varying numbers of samples in black\nTrue value in red")
 
 ```
 ## How do the parameters of the proposal distribution affect the importance sampling efficiency?
 
 Do you think we did a good job?
 
-Let's compute the empirical variance of our estimator of $\text{E}[\text{sin}(\pi x)]$ for a variety of different proposal variances to see what happens.
+Let's compute the empirical variance of an estimator of the variance for a variety of different proposal variances to see what happens.
 
 ```{r}
 R = 100
@@ -176,16 +197,22 @@ sigmas = seq(0.1, 0.5, length = 50)
 alpha = 2.0
 beta = alpha
 
-q = function(x, sigma) dnorm(x, 0.5, sigma)
+q = function(x, sigma) {
+  dnorm(x, 0.5, sigma) / (pnorm(1.0, 0.5, sigma) - pnorm(0.0, 0.5, sigma))
+}
 p = function(x) dbeta(x, alpha, beta)
 
 N = 1000
 tibbles = list()
 for(i in 1:length(sigmas)) {
   sigma = sigmas[i]
-  estimates = rep(0, P)
+  estimates = rep(0, R)
   for(r in 1:R) {
-    x = rnorm(N, 0.5, sigma)
+    x = rnorm(2 * N, 0.5, sigma)
+    x = x[x > 0 & x < 1]
+    x = x[1:N]
+    if(length(x) < N)
+      warning("Didn't manage to generate N samples. Try this again probly")
     estimates[r] = sum(sin(pi * x) * p(x) / q(x, sigma)) / N
   }
   tibbles[[i]] = list(esimates = estimates, sigma = sigma) %>% as.tibble
@@ -196,7 +223,44 @@ tibbles %>% bind_rows %>%
   geom_point(alpha = 0.5)
 ```
 
-Who knew? Looks like a standard deviation of about ~0.18 is most efficient for computing this estimate.
+Who knew? Looks like a standard deviation of about ~0.18 is most efficient for computing this estimate. Another way of diagnosing the efficiency of a proposal distribution is by looking at the distributions of the importance weights. Presumably if the importance weights are closer to one, the estimator is better.
+
+```{r}
+R = 100
+sigmas = seq(0.1, 0.5, length = 50)
+
+alpha = 2.0
+beta = alpha
+
+q = function(x, sigma) {
+  dnorm(x, 0.5, sigma) / (pnorm(1.0, 0.5, sigma) - pnorm(0.0, 0.5, sigma))
+}
+p = function(x) dbeta(x, alpha, beta)
+
+N = 100
+tibbles = list()
+for(i in 1:length(sigmas)) {
+  sigma = sigmas[i]
+  x = rnorm(2 * N, 0.5, sigma)
+  x = x[x > 0 & x < 1]
+  x = x[1:N]
+  if(length(x) < N)
+    warning("Didn't manage to generate N samples. Try this again probly")
+  ratios = p(x) / q(x, sigma)
+  tibbles[[i]] = list(ratios = ratios, sigma = sigma) %>% as.tibble
+}
+
+tibbles %>% bind_rows %>%
+  ggplot(aes(sigma, log(ratios))) +
+  geom_point(alpha = 0.5)
+
+# tibbles %>% bind_rows %>%
+#   group_by(sigma) %>%
+#   summarize(y = var(log(ratios + 1e-12))) %>%
+#   ggplot(aes(sigma, y)) +
+#   geom_point(alpha = 0.5)
+```
+It looks like the lowest variance ratios happen around $\sigma = 0.25$. It's not the same answer we got above, but maybe it's close enough.
 
 ```{r}
 alpha = 2.0
