@@ -59,6 +59,10 @@ With this we can compute an estimate of $\int f(x) p(x) dx$ without having to co
 
 The choice of $g(x)$ is non-trivial and greatly affects the efficiency of this method.
 
+Instead of normalizing by N, it's usually better to normalize by $\sum_i^N \frac{p(x_i)}{g(x_i)}$. One of the advantages of this is that $p(x)$ does not need to be a normalized distribution (the normalization constant would cancel out). Another is that it generally lowers the variance of the estimate. You should look elsewhere for more info on this as I (Ben) do not really know much about it other than it is important.
+
+$$\frac{1}{\sum_i^N \frac{p(x_i)}{g(x_i)}} \sum_i^N f(x_i) \frac{p(x_i)}{g(x_i)}$$
+
 ## Can we sample from the beta(2.0, 2.0) distribution more efficiently?
 
 ```{r}
@@ -69,8 +73,12 @@ beta = 3.0
 mode = (alpha - 1) / (alpha + beta - 2)
 maxB = dbeta(mode, alpha, beta)
 
-x = runif(N)
+x = rnorm(N, mode, 0.3)
 y = runif(N) * 1.35 * dnorm(x, mode, 0.3)
+
+# Should always check that these things are working
+print(paste0("Computed mean: ", mean(x[y < dbeta(x, alpha, beta)]), ", Exact mean: ", alpha / (alpha + beta)))
+print(paste0("Computed variance: ", var(x[y < dbeta(x, alpha, beta)]), ", Exact variance: ", alpha * beta / ((alpha + beta)^2 * (alpha + beta + 1))))
 
 list(x = x,
      y = y) %>%
@@ -102,7 +110,7 @@ for(p in 1:1000) {
   yunif[p] = sum(y < dbeta(x, alpha, beta)) / N
   
   # Normal proposal
-  x = runif(N)
+  x = rnorm(N, mode, 0.3)
   y = 1.35 * dnorm(x, mode, 0.3) * runif(N)
   ynorm[p] = sum(y < dbeta(x, alpha, beta)) / N
 }
@@ -114,7 +122,7 @@ list(yunif = yunif,
   geom_histogram(aes(fill = which)) +
   xlab("Acceptance probabilities (this percentage of the samples generated are useful)")
 ```
-  
+
 ## Can we rejection sample from a beta(0.9, 0.9)?
 
 It'd be a trick. The distribution is unbounded in y (dbeta(0, 0.9, 0.9) == inf). We'd probably want to sample from an unbounded distribution on y and then do the rejection ratio by comparing against the inverse of the beta density (which is a multivalued inverse).
@@ -135,7 +143,8 @@ Ns = 1:N
 estimate = rep(0, N)
 for(n in Ns) {
   x = runif(n)
-  estimate[n] = sum(x * p(x) / q(x)) / n
+  w = p(x) / q(x)
+  estimate[n] = sum(x * w) / sum(w)
 }
 
 list(Ns = Ns,
@@ -158,21 +167,17 @@ beta = 3.0
 
 mode = (alpha - 1) / (alpha + beta - 2)
 
-q = function(x) {
-  dnorm(x, mode, 0.3) / (pnorm(1.0, mode, 0.3) - pnorm(0.0, mode, 0.3))
-}
+q = function(x) dnorm(x, mode, 0.3)
 p = function(x) dbeta(x, alpha, beta)
 
 N = 1000
 Ns = 1:N
 estimate = rep(0, N)
 for(n in Ns) {
-  x = rnorm(2 * n, mode, 0.30)
-  x = x[x > 0 & x < 1]
-  x = x[1:n]
-  if(length(x) < n)
-    warning("Didn't manage to generate N samples. Try this again probly")
-  estimate[n] = sum(x^2  * p(x) / q(x)) / n - (sum(x  * p(x) / q(x)) / n)^2
+  x = rnorm(n, mode, 0.30)
+  w = p(x) / q(x)
+  mu = sum(x  * w) / sum(w)
+  estimate[n] = sum((x - mu)^2 * w) / sum(w)
 }
 
 list(Ns = Ns,
@@ -192,14 +197,12 @@ Let's compute the empirical variance of an estimator of the variance for a varie
 
 ```{r}
 R = 100
-sigmas = seq(0.1, 0.5, length = 50)
+sigmas = seq(0.1, 2.5, length = 50)
 
 alpha = 2.0
 beta = alpha
 
-q = function(x, sigma) {
-  dnorm(x, 0.5, sigma) / (pnorm(1.0, 0.5, sigma) - pnorm(0.0, 0.5, sigma))
-}
+q = function(x, sigma) dnorm(x, 0.5, sigma)
 p = function(x) dbeta(x, alpha, beta)
 
 N = 1000
@@ -208,12 +211,9 @@ for(i in 1:length(sigmas)) {
   sigma = sigmas[i]
   estimates = rep(0, R)
   for(r in 1:R) {
-    x = rnorm(2 * N, 0.5, sigma)
-    x = x[x > 0 & x < 1]
-    x = x[1:N]
-    if(length(x) < N)
-      warning("Didn't manage to generate N samples. Try this again probly")
-    estimates[r] = sum(sin(pi * x) * p(x) / q(x, sigma)) / N
+    x = rnorm(N, 0.5, sigma)
+    w = p(x) / q(x, sigma)
+    estimates[r] = sum(sin(pi * x) * w) / sum(w)
   }
   tibbles[[i]] = list(esimates = estimates, sigma = sigma) %>% as.tibble
 }
@@ -223,29 +223,25 @@ tibbles %>% bind_rows %>%
   geom_point(alpha = 0.5)
 ```
 
-Who knew? Looks like a standard deviation of about ~0.18 is most efficient for computing this estimate. Another way of diagnosing the efficiency of a proposal distribution is by looking at the distributions of the importance weights. Presumably if the importance weights are closer to one, the estimator is better.
+Something between about 0.2 and 0.5 seems to be the most efficient for computing this estimate. Do you think the ideal importance sampling distribution might change if we were computing a different expectation (try it with the code above)?
+
+Another way of diagnosing the efficiency of a proposal distribution is by looking at the distributions of the importance weights. Presumably if the importance weights are closer to one, the estimator is better.
 
 ```{r}
 R = 100
-sigmas = seq(0.1, 0.5, length = 50)
+sigmas = seq(0.1, 2.5, length = 50)
 
 alpha = 2.0
 beta = alpha
 
-q = function(x, sigma) {
-  dnorm(x, 0.5, sigma) / (pnorm(1.0, 0.5, sigma) - pnorm(0.0, 0.5, sigma))
-}
+q = function(x, sigma) dnorm(x, 0.5, sigma)
 p = function(x) dbeta(x, alpha, beta)
 
 N = 100
 tibbles = list()
 for(i in 1:length(sigmas)) {
   sigma = sigmas[i]
-  x = rnorm(2 * N, 0.5, sigma)
-  x = x[x > 0 & x < 1]
-  x = x[1:N]
-  if(length(x) < N)
-    warning("Didn't manage to generate N samples. Try this again probly")
+  x = rnorm(N, 0.5, sigma)
   ratios = p(x) / q(x, sigma)
   tibbles[[i]] = list(ratios = ratios, sigma = sigma) %>% as.tibble
 }
@@ -260,16 +256,6 @@ tibbles %>% bind_rows %>%
 #   ggplot(aes(sigma, y)) +
 #   geom_point(alpha = 0.5)
 ```
-It looks like the lowest variance ratios happen around $\sigma = 0.25$. It's not the same answer we got above, but maybe it's close enough.
 
-```{r}
-alpha = 2.0
-beta = alpha
+It looks like the lowest variance ratios probably happen around $\sigma = 0.25$. This isn't exactly the same information as above. The distribution of ratios is easier to compute than actually estimating the variances like we did previously.
 
-list(x = seq(0, 1, length = 1000)) %>%
-  as.tibble %>%
-  ggplot(aes(x)) +
-  stat_function(fun = function(x) dbeta(x, alpha, beta)) +
-  stat_function(fun = function(x) dnorm(x, 0.5, 0.18), color = "blue") +
-  ggtitle("Target in black, Importance sampling distribution in blue")
-```
