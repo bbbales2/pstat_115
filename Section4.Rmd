@@ -125,7 +125,7 @@ list(yunif = yunif,
 
 ## Can we rejection sample from a beta(0.9, 0.9)?
 
-It'd be a trick. The distribution is unbounded in y (dbeta(0, 0.9, 0.9) == inf). We'd probably want to sample from an unbounded distribution on y and then do the rejection ratio by comparing against the inverse of the beta density (which is a multivalued inverse).
+It'd be a trick. The distribution is unbounded in y (dbeta(0, 0.9, 0.9) == inf). We'd need something similarly unbounded I guess. It certainly doesn't seem easy to me, but that doesn't mean it's impossible.
 
 ## Can compute expectations over the beta(0.9, 0.9) distribution using importance sampling?
 
